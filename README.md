@@ -10,15 +10,31 @@ az ad group member add -g aks-admin --member-id 6f6a0824-2d7e-4380-bbfa-6846edb7
 # Create namespace reader group
 az ad group create --display-name 'aks-namespace-reader' --mail-nickname 'aks-namespace-reader' --description "Principals in this group can read a specified namespace" --query id -o tsv
 
-# Deploy AKS network
+## Deploy Hub Network
+az group create --name aks-hub-network --location eastus
+az deployment group create --template-file ./cluster-deployment/hub-network.bicep -g aks-hub-network
+
+## Deploy jumpbox
+az group create --name aks-jump-box --location eastus
+az deployment group create --template-file ./cluster-deployment/jump-box.bicep -g aks-jump-box
+
+## Deploy spoke network
 az group create --name aks-cluster-001 --location eastus
-az deployment group create --template-file ./aks-networking.bicep -g aks-cluster-001
+az deployment group create --template-file ./cluster-deployment/spoke-network-and-acr.bicep -g aks-cluster-001
 
-# Get network id
-az network vnet list -g aks-cluster-001 --query [].id -o tsv
+## Deoply AKS
+az deployment group create --template-file ./cluster-deployment/aks-cluster.bicep -g aks-cluster-001
 
-# Deploy ACR and ALA
-az deployment group create --template-file ./container-regisry.bicep -g aks-cluster-001
+# Install AZ CLI on Jump Box
+curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 
-# Stage boot critical images in ACR
-az acr import --source ghcr.io/kubereboot/kured:1.14.0 -n sceacr
+# Install Kubectl on Jump Box
+sudo az aks install-cli
+
+# Test ACR Build
+az acr import --source ghcr.io/kubereboot/kured:1.14.0 -n scecontainerregistry
+
+# Remote commands to private AKS cluster
+az aks command invoke --resource-group aks-cluster-001 --name aks-test-001 --command "kubectl get pods -n kube-system"
+
+
