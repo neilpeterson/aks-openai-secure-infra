@@ -19,11 +19,11 @@ az group create --name aks-jump-box --location eastus
 az deployment group create --template-file ./cluster-deployment/jump-box.bicep -g aks-jump-box
 
 ## Deploy spoke network
-az group create --name aks-cluster-001 --location eastus
-az deployment group create --template-file ./cluster-deployment/spoke-network-and-acr.bicep -g aks-cluster-001
+az group create --name aks-cluster-one --location eastus
+az deployment group create --template-file ./cluster-deployment/spoke-network-and-acr.bicep -g aks-cluster-one
 
 ## Deoply AKS
-az deployment group create --template-file ./cluster-deployment/aks-cluster.bicep -g aks-cluster-001
+az deployment group create --template-file ./cluster-deployment/aks-cluster.bicep -g aks-cluster-one
 
 # Install AZ CLI on Jump Box
 curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
@@ -35,6 +35,6 @@ sudo az aks install-cli
 az acr import --source ghcr.io/kubereboot/kured:1.14.0 -n scecontainerregistry
 
 # Remote commands to private AKS cluster
-az aks command invoke --resource-group aks-cluster-001 --name aks-test-001 --command "kubectl get pods -n kube-system"
+az aks command invoke --resource-group aks-cluster-one --name aks-test-001 --command "kubectl get pods -n kube-system"
 
 
