@@ -31,8 +31,9 @@ curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 # Install Kubectl on Jump Box
 sudo az aks install-cli
 
-# Test ACR Build
+# Import containers into private registry
 az acr import --source ghcr.io/kubereboot/kured:1.14.0 -n scecontainerregistry
+az acr import --source docker.io/library/traefik:v2.10.7 -n scecontainerregistry
 
 # Remote commands to private AKS cluster
 az aks command invoke --resource-group aks-cluster-one --name aks-test-001 --command "kubectl get pods -n kube-system"
