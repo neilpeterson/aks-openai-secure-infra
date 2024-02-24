@@ -11,6 +11,8 @@ param domainName string = 'apim-lab-aks.nepeters.supplychain.microsoft.com'
 // param aksDomainCertificate string = 'https://aks-certificates.vault.azure.net/secrets/apim-lab-aks/3fa2ff3f64ed46208cec22c6fd1f3285'
 // param aksIngressCertificate string = 'https://aks-certificates.vault.azure.net/secrets/apim-lab-aks-ingress/2d3582cfa14d4c9a99f3ae9b4d3131fb'
 
+param aksOSSKU string = 'AzureLinux'
+
 param keyVautlName string = 'aks-certificates'
 param keyVaultResourceGroupoName string = 'aks-shared-resources'
 
@@ -101,7 +103,7 @@ resource AKSCluster 'Microsoft.ContainerService/managedClusters@2023-02-02-previ
         osDiskSizeGB: 80
         osDiskType: 'Ephemeral'
         osType: 'Linux'
-        osSKU: 'Ubuntu'
+        osSKU: aksOSSKU
         minCount: 3
         maxCount: 4
         vnetSubnetID:'${virtualNetwork.id}/subnets/kubernetes-nodes'
@@ -135,7 +137,7 @@ resource AKSCluster 'Microsoft.ContainerService/managedClusters@2023-02-02-previ
         osDiskSizeGB: 120
         osDiskType: 'Ephemeral'
         osType: 'Linux'
-        osSKU: 'Ubuntu'
+        osSKU: aksOSSKU
         minCount: 2
         maxCount: 5
         vnetSubnetID: '${virtualNetwork.id}/subnets/kubernetes-nodes'
