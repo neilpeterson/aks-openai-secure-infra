@@ -1,0 +1,10 @@
+using '../../cluster-deployment/spoke-network-and-acr.bicep'
+
+param clusterVNetName = 'appgw-kubernetes'
+param geoRedundancyLocation = 'westus'
+param acrServiceName = 'scecontainerregistry'
+param hubVirtualNetworkName = 'vnet-eastus-hub'
+param hubVirtualNetworkResourceGroup = 'aks-hub-network'
+param keyVaultResourceGroupoName = 'aks-shared-resources'
+param keyVautlName = 'aks-certificates'
+param location = 'eastus'

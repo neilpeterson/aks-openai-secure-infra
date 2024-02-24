@@ -1,18 +1,17 @@
-param aksAdminGroup string = '1c53e0cf-094a-49bb-b746-ff2d9f601b6c'
+param aksAdminGroup string
 param clusterAuthorizedIPRanges array = []
-param location string = resourceGroup().location
-param kubernetesVersion string = '1.28.3'
-param clusterName string = 'aks-test-one'
-param logAnalyticsWorkspaceName string = 'all-logs'
-param virtualNetworkName string = 'appgw-kubernetes'
-param privateCluster bool = false
-param applicationGatewayName string = 'appgw-kubernetes'
-param domainName string = 'apim-lab-aks.nepeters.supplychain.microsoft.com'
+param location string
+param kubernetesVersion string
+param clusterName string
+param logAnalyticsWorkspaceName string
+param virtualNetworkName string
+param privateCluster bool
+param applicationGatewayName string
+param domainName string
 // param aksDomainCertificate string = 'https://aks-certificates.vault.azure.net/secrets/apim-lab-aks/3fa2ff3f64ed46208cec22c6fd1f3285'
 // param aksIngressCertificate string = 'https://aks-certificates.vault.azure.net/secrets/apim-lab-aks-ingress/2d3582cfa14d4c9a99f3ae9b4d3131fb'
 
-param aksOSSKU string = 'AzureLinux'
-
+param aksOSSKU string
 param keyVautlName string = 'aks-certificates'
 param keyVaultResourceGroupoName string = 'aks-shared-resources'
 
@@ -38,6 +37,8 @@ resource aksDomainCertificate 'Microsoft.KeyVault/vaults/secrets@2023-07-01'  ex
   name: 'apim-lab-aks'
 }
 
+
+
 // resource aksIngressCertificate 'Microsoft.KeyVault/vaults/secrets@2023-07-01'  existing = {
 //   parent: keyVault
 //   name: 'apim-lab-aks-ingress'
@@ -53,6 +54,16 @@ resource aksDomainCertificate 'Microsoft.KeyVault/vaults/secrets@2023-07-01'  ex
 resource clusterControlPlane 'Microsoft.ManagedIdentity/userAssignedIdentities@2018-11-30' = {
   name: 'aks-${clusterName}'
   location: location
+}
+
+module ndEnsureClusterIdentityHasRbacToSelfManagedResources 'modules/cluster-access.bicep' = {
+  name: 'EnsureClusterIdentityHasRbacToSelfManagedResources'
+  scope: resourceGroup(resourceGroup().name)
+  params: {
+    miClusterControlPlanePrincipalId: clusterControlPlane.properties.principalId
+    clusterControlPlaneIdentityName: clusterControlPlane.name
+    targetVirtualNetworkName: virtualNetwork.name
+  }
 }
 
 // Built-in Azure RBAC role that can be applied to a cluster or a namespace to grant read and write privileges to that scope for a user or group

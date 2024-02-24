@@ -1,7 +1,8 @@
-param location string = resourceGroup().location
+param location string
+param logAnalyticeWorkspaceName string
 
 resource logAnalyticeWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10-01' = {
-  name: 'hub-network-all-logs'
+  name: logAnalyticeWorkspaceName
   location: location
   properties: {
     sku: {
@@ -213,12 +214,6 @@ resource vnetHub 'Microsoft.Network/virtualNetworks@2021-05-01' = {
         }
       }
       {
-        name: 'GatewaySubnet'
-        properties: {
-          addressPrefix: '10.200.0.64/27'
-        }
-      }
-      {
         name: 'AzureBastionSubnet'
         properties: {
           addressPrefix: '10.200.0.128/26'
@@ -277,3 +272,5 @@ resource bastion 'Microsoft.Network/bastionHosts@2020-11-01' = {
     ]
   }
 }
+
+output vnetName string = vnetHub.name

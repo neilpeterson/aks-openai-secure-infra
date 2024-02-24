@@ -1,10 +1,8 @@
-param location string = resourceGroup().location
-param adminUsername string = 'azureadmin'
-param hubVirtualNetworkResoruceGroupName string = 'aks-hub-network'
-param hubVirtualNetworkName string  = 'vnet-eastus-hub'
-
-@secure()
-param adminPassword string
+param location string
+param jumpBoxName string
+param adminUsername string
+param hubVirtualNetworkResoruceGroupName string
+param hubVirtualNetworkName string
 
 module jumpBoxSubnet 'modules/jump-box-subnet.bicep' = {
   name: 'jump-box'
@@ -37,7 +35,7 @@ resource networkInterface 'Microsoft.Network/networkInterfaces@2021-05-01' = {
 }
 
 resource virtualMachine 'Microsoft.Compute/virtualMachines@2021-11-01' = {
-  name: 'jump-box'
+  name: jumpBoxName
   location: location
   properties: {
     hardwareProfile: {

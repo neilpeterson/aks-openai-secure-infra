@@ -1,9 +1,11 @@
-param location string = resourceGroup().location
-param clusterVNetName string = 'appgw-kubernetes'
-param geoRedundancyLocation string = 'westus'
-param acrIdentifier string = 'scecontainerregistry'
-param hubVirtualNetworkName string = 'vnet-eastus-hub'
-param hubVirtualNetworkResourceGroup string = 'aks-hub-network'
+param location string
+param clusterVNetName string
+param geoRedundancyLocation string
+param acrServiceName string
+param hubVirtualNetworkName string
+param hubVirtualNetworkResourceGroup string
+param keyVautlName string
+param keyVaultResourceGroupoName string
 
 resource hubVirtualNetwork 'Microsoft.Network/virtualNetworks@2021-05-01' existing = {
   name: hubVirtualNetworkName
@@ -175,7 +177,7 @@ resource virtualNetwork 'Microsoft.Network/virtualNetworks@2021-05-01' = {
         }
       }
       {
-        name: 'cluster-ingress'
+        name: 'cluster-internal-lb'
         properties: {
           addressPrefix: '10.240.4.0/28'
           networkSecurityGroup: {
@@ -289,7 +291,7 @@ resource adminAccountContainerRegistryAccessDisallowed 'Microsoft.Authorization/
 }
 
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2021-09-01' = {
-  name: acrIdentifier
+  name: acrServiceName
   location: location
   sku: {
     name: 'Premium'
@@ -367,7 +369,7 @@ resource privateEndpointACRToVnet 'Microsoft.Network/privateEndpoints@2022-09-01
     }
     privateLinkServiceConnections: [
       {
-        name: 'to_${virtualNetwork.name}'
+        name: virtualNetwork.name
         properties: {
           privateLinkServiceId: containerRegistry.id
           groupIds: [
@@ -401,7 +403,7 @@ resource dnsPrivateZoneACR 'Microsoft.Network/privateDnsZones@2020-06-01' = {
   properties: {}
 
   resource dnsVnetLinkAcrToSpoke 'virtualNetworkLinks' = {
-    name: 'to_${virtualNetwork.name}'
+    name: virtualNetwork.name
     location: 'global'
     properties: {
       virtualNetwork: {
@@ -411,3 +413,62 @@ resource dnsPrivateZoneACR 'Microsoft.Network/privateDnsZones@2020-06-01' = {
     }
   }
 }
+
+resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+  name: keyVautlName
+  scope: resourceGroup(keyVaultResourceGroupoName)
+}
+
+// Enabling Azure Key Vault Private Link support.
+resource dnsPrivateZoneAKV 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+  name: 'privatelink.vaultcore.azure.net'
+  location: 'global'
+
+  resource dnsVnetLinkAKVToSpoke 'virtualNetworkLinks' = {
+    name: virtualNetwork.name
+    location: 'global'
+    properties: {
+      virtualNetwork: {
+        id: virtualNetwork.id
+      }
+      registrationEnabled: false
+    }
+  }
+}
+
+resource privateEndpointAKVToVnet 'Microsoft.Network/privateEndpoints@2021-05-01' = {
+  name: keyVault.name
+  location: location
+  properties: {
+    subnet: {
+      id: '${virtualNetwork.id}/subnets/private-link-endpoints'
+    }
+    privateLinkServiceConnections: [
+      {
+        name: virtualNetwork.name
+        properties: {
+          privateLinkServiceId: keyVault.id
+          groupIds: [
+            'vault'
+          ]
+        }
+      }
+    ]
+  }
+
+  resource pdnszg 'privateDnsZoneGroups' = {
+    name: 'default'
+    properties: {
+      privateDnsZoneConfigs: [
+        {
+          name: 'privatelink-akv-net'
+          properties: {
+            privateDnsZoneId: dnsPrivateZoneAKV.id
+          }
+        }
+      ]
+    }
+  }
+}
+
+output logAnalyticsWorkspaceId string = logAnalyticeWorkspace.id
