@@ -10,10 +10,10 @@ Based on the AKS best practices found in the Microsoft AKS Baseline ([documentat
 az ad group create --display-name 'aks-admins' --mail-nickname 'aks-admins' --description "Principals in this group are AKS admins" --query id -o tsv
 
 ##### Create AD user if needed
-az ad user create --display-name=aks-cluster-admin --user-principal-name aks-cluster-admin@nepeters.onmicrosoft.com --force-change-password-next-sign-in --password ''
+az ad user create --display-name=aks-cluster-admin --user-principal-name <replace>> --force-change-password-next-sign-in --password ''
 
 ##### Add user to cluster admin group
-az ad group member add -g aks-admin --member-id 6f6a0824-2d7e-4380-bbfa-6846edb74401
+az ad group member add -g aks-admin --member-id <update>
 
 #### Create namespace reader group
 az ad group create --display-name 'aks-namespace-reader' --mail-nickname 'aks-namespace-reader' --description "Principals in this group can read a specified namespace" --query id -o tsv
