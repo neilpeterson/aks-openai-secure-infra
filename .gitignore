@@ -36,3 +36,4 @@ terraform.rc
 .terraform.lock.hcl
 *.tfplan
 .DS_Store
+notes.txt
