@@ -1,4 +1,4 @@
-Bicep deployment for building a secure and scalable AKS clusters with the intention of hositng OpenAI integrated applications.
+Bicep deployment for building a secure and scalable AKS clusters with the intention of hositng OpenAI integrated applications. Under active development.
 
 Based on the AKS best practices found in the Microsoft AKS Baseline ([documentaton](https://learn.microsoft.com/en-us/azure/architecture/reference-architectures/containers/aks/baseline-aks)).
 
