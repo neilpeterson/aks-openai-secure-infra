@@ -12,3 +12,6 @@ param virtualNetworkName = 'appgw-kubernetes'
 param privateCluster = false
 param applicationGatewayName = 'appgw-kubernetes'
 param domainName = 'apim-lab-aks.nepeters.supplychain.microsoft.com'
+param containerRegistryName = 'nepcontainerregistry'
+param workloadIdentityServiceAccountName = 'pod-workload'
+param workloadIdentityServiceAccountNamespace = 'default'

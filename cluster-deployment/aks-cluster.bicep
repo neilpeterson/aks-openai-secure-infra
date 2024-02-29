@@ -8,12 +8,12 @@ param virtualNetworkName string
 param privateCluster bool
 param applicationGatewayName string
 param domainName string
-// param aksDomainCertificate string = 'https://aks-certificates.vault.azure.net/secrets/apim-lab-aks/3fa2ff3f64ed46208cec22c6fd1f3285'
-// param aksIngressCertificate string = 'https://aks-certificates.vault.azure.net/secrets/apim-lab-aks-ingress/2d3582cfa14d4c9a99f3ae9b4d3131fb'
-
+param containerRegistryName string
 param aksOSSKU string
 param keyVautlName string = 'aks-certificates'
 param keyVaultResourceGroupoName string = 'aks-shared-resources'
+param workloadIdentityServiceAccountName string
+param workloadIdentityServiceAccountNamespace string
 
 var isUsingAzureRBACasKubernetesRBAC = (subscription().tenantId == subscription().tenantId)
 var aksIngressDomainName = 'aks-ingress.${domainName}'
@@ -37,31 +37,22 @@ resource aksDomainCertificate 'Microsoft.KeyVault/vaults/secrets@2023-07-01'  ex
   name: 'apim-lab-aks'
 }
 
-
-
-// resource aksIngressCertificate 'Microsoft.KeyVault/vaults/secrets@2023-07-01'  existing = {
-//   parent: keyVault
-//   name: 'apim-lab-aks-ingress'
-// }
-
-// Added Base64 encoded public cert as secret, but need to better understand, like rotation.
-// resource kvsAppGwIngressInternalAksIngressTls 'Microsoft.KeyVault/vaults/secrets@2023-07-01' existing = {
-//   parent: keyVault
-//   name: 'appgw-ingress-internal-aks-ingress-tls'
-// }
+resource containerRegistry 'Microsoft.ContainerRegistry/registries@2021-09-01' existing = {
+  name: containerRegistryName
+}
 
 // The control plane identity used by the cluster. Used for networking access (VNET joining and DNS updating)
-resource clusterControlPlane 'Microsoft.ManagedIdentity/userAssignedIdentities@2018-11-30' = {
+resource clusterIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2018-11-30' = {
   name: 'aks-${clusterName}'
   location: location
 }
 
-module ndEnsureClusterIdentityHasRbacToSelfManagedResources 'modules/cluster-access.bicep' = {
+module clusterIdentityAssignment 'modules/cluster-access.bicep' = {
   name: 'EnsureClusterIdentityHasRbacToSelfManagedResources'
   scope: resourceGroup(resourceGroup().name)
   params: {
-    miClusterControlPlanePrincipalId: clusterControlPlane.properties.principalId
-    clusterControlPlaneIdentityName: clusterControlPlane.name
+    miClusterControlPlanePrincipalId: clusterIdentity.properties.principalId
+    clusterControlPlaneIdentityName: clusterIdentity.name
     targetVirtualNetworkName: virtualNetwork.name
   }
 }
@@ -72,7 +63,7 @@ resource clusterAdminRole 'Microsoft.Authorization/roleDefinitions@2018-01-01-pr
   scope: subscription()
 }
 
-resource mcMicrosoftEntraAdminGroupClusterAdminRole_roleAssignment 'Microsoft.Authorization/roleAssignments@2020-10-01-preview' = if (isUsingAzureRBACasKubernetesRBAC) {
+resource clusterAdminRoleAssignment 'Microsoft.Authorization/roleAssignments@2020-10-01-preview' = if (isUsingAzureRBACasKubernetesRBAC) {
   scope: AKSCluster
   name: guid('microsoft-entra-admin-group', AKSCluster.id, aksAdminGroup)
   properties: {
@@ -84,12 +75,13 @@ resource mcMicrosoftEntraAdminGroupClusterAdminRole_roleAssignment 'Microsoft.Au
 }
 
 // Built-in Azure RBAC role that is applied to a cluster to indicate they can be considered a user/group of the cluster, subject to additional RBAC permissions
+// TODO - don't think I quite understand this.
 resource serviceClusterUserRole 'Microsoft.Authorization/roleDefinitions@2018-01-01-preview' existing = {
   name: '4abbcc35-e782-43d8-92c5-2d3f1bd2253f'
   scope: subscription()
 }
 
-resource mcMicrosoftEntraAdminGroupServiceClusterUserRole_roleAssignment 'Microsoft.Authorization/roleAssignments@2020-10-01-preview' = if (isUsingAzureRBACasKubernetesRBAC) {
+resource serviceClusterUserRoleAssignment 'Microsoft.Authorization/roleAssignments@2020-10-01-preview' = if (isUsingAzureRBACasKubernetesRBAC) {
   scope: AKSCluster
   name: guid('microsoft-entra-admin-group-sc', AKSCluster.id, aksAdminGroup)
   properties: {
@@ -100,6 +92,7 @@ resource mcMicrosoftEntraAdminGroupServiceClusterUserRole_roleAssignment 'Micros
   }
 }
 
+// TODO - review all settings
 resource AKSCluster 'Microsoft.ContainerService/managedClusters@2023-02-02-preview' = {
   name: clusterName
   location: location
@@ -310,7 +303,7 @@ resource AKSCluster 'Microsoft.ContainerService/managedClusters@2023-02-02-previ
   identity: {
     type: 'UserAssigned'
     userAssignedIdentities: {
-      '${clusterControlPlane.id}': {}
+      '${clusterIdentity.id}': {}
     }
   }
   sku: {
@@ -319,9 +312,79 @@ resource AKSCluster 'Microsoft.ContainerService/managedClusters@2023-02-02-previ
   }
 }
 
+resource ACRPullRole 'Microsoft.Authorization/roleDefinitions@2018-01-01-preview' existing = {
+  name: '7f951dda-4ed3-4680-a7ca-43fe172d538d'
+  scope: subscription()
+}
+
+resource cluaterACRAccess 'Microsoft.Authorization/roleAssignments@2020-10-01-preview' = {
+  scope: containerRegistry
+  name: guid(clusterIdentity.id, ACRPullRole.id)
+  properties: {
+    roleDefinitionId: ACRPullRole.id
+    description: 'Allows AKS to pull container images from this ACR instance.'
+    principalId: AKSCluster.properties.identityProfile.kubeletidentity.objectId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Workload Identity for Key Vault access.
+resource podWorkladIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2022-01-31-preview' = {
+  name: 'pod-workload'
+  location: location
+
+  resource federatedCreds 'federatedIdentityCredentials@2022-01-31-preview' = {
+    name: 'pod-workload'
+    properties: {
+      issuer: AKSCluster.properties.oidcIssuerProfile.issuerURL
+      subject: 'system:serviceaccount:${workloadIdentityServiceAccountNamespace}:${workloadIdentityServiceAccountName}'
+      audiences: [
+        'api://AzureADTokenExchange'
+      ]
+    }
+  }
+}
+
+module podWorkloadIdentityAKVAccess 'modules/key-vault-access.bicep' = {
+  name: 'podWorkloadIdentityAKVAccess'
+  scope: resourceGroup(keyVaultResourceGroupoName)
+  params: {
+    keyVaultName: keyVault.name
+    miAppGatewayPrincipalId: podWorkladIdentity.properties.principalId
+    identityName: podWorkladIdentity.name
+  }
+}
+
+// Workload Identity for Ingress Controller Key Vault access.
+resource podWorkladIdentityIngress 'Microsoft.ManagedIdentity/userAssignedIdentities@2022-01-31-preview' = {
+  name: 'ingress-pod-workload'
+  location: location
+
+  resource federatedCreds 'federatedIdentityCredentials@2022-01-31-preview' = {
+    name: 'ingress-controller'
+    properties: {
+      issuer: AKSCluster.properties.oidcIssuerProfile.issuerURL
+      subject: 'system:serviceaccount:a0008:traefik-ingress-controller'
+      audiences: [
+        'api://AzureADTokenExchange'
+      ]
+    }
+  }
+}
+
+module ingressIdentityAKVAccess 'modules/key-vault-access.bicep' = {
+  name: 'ingressIdentityAKVAccess'
+  scope: resourceGroup(keyVaultResourceGroupoName)
+  params: {
+    keyVaultName: keyVault.name
+    miAppGatewayPrincipalId: podWorkladIdentityIngress.properties.principalId
+    identityName: podWorkladIdentityIngress.name
+  }
+}
+
 // User Managed Identity that App Gateway is assigned. Used for Azure Key Vault Access.
-resource miAppGatewayFrontend 'Microsoft.ManagedIdentity/userAssignedIdentities@2018-11-30' = {
-  name: 'mi-appgateway-frontend'
+resource appGatewayFrontend 'Microsoft.ManagedIdentity/userAssignedIdentities@2018-11-30' = {
+  name: 'application-gateway'
   location: location
 }
 
@@ -343,7 +406,7 @@ resource applicationGatewayIP 'Microsoft.Network/publicIPAddresses@2021-05-01' =
   }
 }
 
-resource wafPolicy 'Microsoft.Network/ApplicationGatewayWebApplicationFirewallPolicies@2021-05-01' = {
+resource WAFPolicy 'Microsoft.Network/ApplicationGatewayWebApplicationFirewallPolicies@2021-05-01' = {
   name: 'waf-${clusterName}'
   location: location
   properties: {
@@ -369,46 +432,13 @@ resource wafPolicy 'Microsoft.Network/ApplicationGatewayWebApplicationFirewallPo
   }
 }
 
-// // Built-in Azure RBAC role that is applied a Key Vault to grant with metadata, certificates, keys and secrets read privileges.  Granted to App Gateway's managed identity.
-// resource keyVaultReaderRole 'Microsoft.Authorization/roleDefinitions@2018-01-01-preview' existing = {
-//   name: '21090545-7ca7-4776-b22c-e363652d74d2'
-//   scope: subscription()
-// }
-
-// // Built-in Azure RBAC role that is applied to a Key Vault to grant with secrets content read privileges. Granted to both Key Vault and our workload's identity.
-// resource keyVaultSecretsUserRole 'Microsoft.Authorization/roleDefinitions@2018-01-01-preview' existing = {
-//   name: '4633458b-17de-408a-b874-0445c86b69e6'
-//   scope: subscription()
-// }
-
-// // Grant the Azure Application Gateway managed identity with key vault reader role permissions; this allows pulling frontend and backend certificates.
-// resource kvMiAppGatewayFrontendSecretsUserRole_roleAssignment 'Microsoft.Authorization/roleAssignments@2020-10-01-preview' = {
-//   scope: keyVault
-//   name: guid(resourceGroup().id, 'mi-appgateway-frontend', keyVaultSecretsUserRole.id)
-//   properties: {
-//     roleDefinitionId: keyVaultSecretsUserRole.id
-//     principalId: miAppGatewayFrontend.properties.principalId
-//     principalType: 'ServicePrincipal'
-//   }
-// }
-
-// // Grant the Azure Application Gateway managed identity with key vault reader role permissions; this allows pulling frontend and backend certificates.
-// resource kvMiAppGatewayFrontendKeyVaultReader_roleAssignment 'Microsoft.Authorization/roleAssignments@2020-10-01-preview' = {
-//   scope: keyVault
-//   name: guid(resourceGroup().id, 'mi-appgateway-frontend', keyVaultReaderRole.id)
-//   properties: {
-//     roleDefinitionId: keyVaultReaderRole.id
-//     principalId: miAppGatewayFrontend.properties.principalId
-//     principalType: 'ServicePrincipal'
-//   }
-// }
-
 module appGatewayKeyVaultAccess 'modules/key-vault-access.bicep' = {
   name: 'appGatewayKeyVaultAccess'
   scope: resourceGroup(keyVaultResourceGroupoName)
   params: {
     keyVaultName: keyVault.name
-    miAppGatewayPrincipalId: miAppGatewayFrontend.properties.principalId
+    miAppGatewayPrincipalId: appGatewayFrontend.properties.principalId
+    identityName: appGatewayFrontend.name
   }
 }
 
@@ -418,7 +448,7 @@ resource applicationGateway 'Microsoft.Network/applicationGateways@2021-05-01' =
   identity: {
     type: 'UserAssigned'
     userAssignedIdentities: {
-      '${miAppGatewayFrontend.id}': {}
+      '${appGatewayFrontend.id}': {}
     }
   }
   zones: pickZones('Microsoft.Network', 'applicationGateways', location, 3)
@@ -479,7 +509,7 @@ resource applicationGateway 'Microsoft.Network/applicationGateways@2021-05-01' =
       maxCapacity: 10
     }
     firewallPolicy: {
-      id: wafPolicy.id
+      id: WAFPolicy.id
     }
     enableHttp2: false
     sslCertificates: [
@@ -579,4 +609,3 @@ resource applicationGateway 'Microsoft.Network/applicationGateways@2021-05-01' =
     appGatewayKeyVaultAccess
   ]
 }
-

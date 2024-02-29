@@ -1,5 +1,6 @@
 param keyVaultName string
 param miAppGatewayPrincipalId string
+param identityName string
 
 resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: keyVaultName
@@ -20,7 +21,7 @@ resource keyVaultSecretsUserRole 'Microsoft.Authorization/roleDefinitions@2018-0
 // Grant the Azure Application Gateway managed identity with key vault reader role permissions; this allows pulling frontend and backend certificates.
 resource kvMiAppGatewayFrontendSecretsUserRole_roleAssignment 'Microsoft.Authorization/roleAssignments@2020-10-01-preview' = {
   scope: keyVault
-  name: guid(resourceGroup().id, 'mi-appgateway-frontend', keyVaultSecretsUserRole.id)
+  name: guid(resourceGroup().id, identityName, keyVaultSecretsUserRole.id)
   properties: {
     roleDefinitionId: keyVaultSecretsUserRole.id
     principalId: miAppGatewayPrincipalId
@@ -31,7 +32,7 @@ resource kvMiAppGatewayFrontendSecretsUserRole_roleAssignment 'Microsoft.Authori
 // Grant the Azure Application Gateway managed identity with key vault reader role permissions; this allows pulling frontend and backend certificates.
 resource kvMiAppGatewayFrontendKeyVaultReader_roleAssignment 'Microsoft.Authorization/roleAssignments@2020-10-01-preview' = {
   scope: keyVault
-  name: guid(resourceGroup().id, 'mi-appgateway-frontend', keyVaultReaderRole.id)
+  name: guid(resourceGroup().id, identityName, keyVaultReaderRole.id)
   properties: {
     roleDefinitionId: keyVaultReaderRole.id
     principalId: miAppGatewayPrincipalId

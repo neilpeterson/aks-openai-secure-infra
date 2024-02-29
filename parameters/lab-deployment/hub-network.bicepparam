@@ -18,7 +18,7 @@ param logAnalyticeWorkspaceName = 'hub-network-logs'
 
 // param clusterVNetName = 'appgw-kubernetes'
 // param geoRedundancyLocation = 'westus'
-// param acrServiceName = 'scecontainerregistry'
+// param acrServiceName = 'nepcontainerregistry'
 // param hubVirtualNetworkName = 'vnet-eastus-hub'
 // param hubVirtualNetworkResourceGroup = 'aks-hub-network'
 

@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  selector:
+    matchLabels:
+      app: nginx
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: nginx
+        azure.workload.identity/use: "true"
+    spec:
+      serviceAccountName: "pod-workload"
+      containers:
+      - name: nginx
+        image: nginx:1.14.2
+        ports:
+        - containerPort: 80
+        env:
+        - name: KEYVAULT_URL
+          value: "https://aks-certificates.vault.azure.net/"
+        - name: SECRET_NAME
+          value: 'jump-box-admin-password'
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: quick-start
+  namespace: "default"
+  labels:
+    azure.workload.identity/use: "true"
+spec:
+  serviceAccountName: "pod-workload"
+  containers:
+    - image: ghcr.io/azure/azure-workload-identity/msal-go
+      name: oidc
+      env:
+      - name: KEYVAULT_URL
+        value: "https://aks-certificates.vault.azure.net/"
+      - name: SECRET_NAME
+        value: 'jump-box-admin-password'
+  nodeSelector:
+    kubernetes.io/os: linux
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+  selector:
+    app: nginx
+# ---
+# apiVersion: secrets-store.csi.x-k8s.io/v1
+# kind: SecretProviderClass
+# metadata:
+#   name: azure-sync
+# spec:
+#   provider: azure
+#   secretObjects:
+#   - data:
+#     - key: username
+#       objectName: foo1
+#     secretName: foosecret
+#     type: Opaque

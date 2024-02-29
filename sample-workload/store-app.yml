@@ -16,9 +16,8 @@ spec:
         "kubernetes.io/os": linux
       containers:
       - name: rabbitmq
-        # image: mcr.microsoft.com/mirror/docker/library/rabbitmq:3.10-management-alpine
-        image: scecontainerregistry.azurecr.io/mirror/docker/library/rabbitmq:3.10-management-alpine
-        image: 
+        image: mcr.microsoft.com/mirror/docker/library/rabbitmq:3.10-management-alpine
+        # image: nepcontainerregistry.azurecr.io/mirror/docker/library/rabbitmq:3.10-management-alpine
         ports:
         - containerPort: 5672
           name: rabbitmq-amqp
@@ -198,7 +197,8 @@ spec:
         "kubernetes.io/os": linux
       containers:
       - name: store-front
-        image: ghcr.io/azure-samples/aks-store-demo/store-front:latest
+        # image: ghcr.io/azure-samples/aks-store-demo/store-front:latest
+        image: nepcontainerregistry.azurecr.io/azure-samples/aks-store-demo/store-front:latest
         ports:
         - containerPort: 8080
           name: store-front

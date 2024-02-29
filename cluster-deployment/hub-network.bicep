@@ -183,7 +183,7 @@ resource nsgBastionSubnet 'Microsoft.Network/networkSecurityGroups@2021-05-01' =
   }
 }
 
-resource nsgBastionSubnet_diagnosticSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+resource nsgBastionSubnetDiagnostic 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
   scope: nsgBastionSubnet
   name: 'default'
   properties: {
@@ -197,7 +197,7 @@ resource nsgBastionSubnet_diagnosticSettings 'Microsoft.Insights/diagnosticSetti
   }
 }
 
-resource vnetHub 'Microsoft.Network/virtualNetworks@2021-05-01' = {
+resource virtualNetworkHub 'Microsoft.Network/virtualNetworks@2021-05-01' = {
   name: 'vnet-${location}-hub'
   location: location
   properties: {
@@ -226,8 +226,8 @@ resource vnetHub 'Microsoft.Network/virtualNetworks@2021-05-01' = {
   }
 }
 
-resource vnetHub_diagnosticSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
-  scope: vnetHub
+resource virtualNetworkHubDiagnostic 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+  scope: virtualNetworkHub
   name: 'default'
   properties: {
     workspaceId: logAnalyticeWorkspace.id
@@ -265,12 +265,10 @@ resource bastion 'Microsoft.Network/bastionHosts@2020-11-01' = {
             id: bastionPublicIP.id
           }
           subnet: {
-            id: '${vnetHub.id}/subnets/AzureBastionSubnet'
+            id: '${virtualNetworkHub.id}/subnets/AzureBastionSubnet'
           }
         }
       }
     ]
   }
 }
-
-output vnetName string = vnetHub.name

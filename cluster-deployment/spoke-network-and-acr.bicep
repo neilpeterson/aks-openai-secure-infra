@@ -454,6 +454,7 @@ resource privateEndpointAKVToVnet 'Microsoft.Network/privateEndpoints@2021-05-01
         }
       }
     ]
+    customNetworkInterfaceName: keyVault.name
   }
 
   resource pdnszg 'privateDnsZoneGroups' = {
@@ -470,5 +471,3 @@ resource privateEndpointAKVToVnet 'Microsoft.Network/privateEndpoints@2021-05-01
     }
   }
 }
-
-output logAnalyticsWorkspaceId string = logAnalyticeWorkspace.id

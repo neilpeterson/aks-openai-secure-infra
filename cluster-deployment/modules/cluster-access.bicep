@@ -26,7 +26,7 @@ resource snetClusterNodes 'Microsoft.Network/virtualNetworks/subnets@2021-05-01'
 // TODO - add subnet parameter
 resource snetClusterIngress 'Microsoft.Network/virtualNetworks/subnets@2021-05-01' existing = {
   parent: targetVirtualNetwork
-  name: 'cluster-ingress'
+  name: 'cluster-internal-lb'
 }
 
 /*** RESOURCES ***/
