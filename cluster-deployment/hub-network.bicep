@@ -1,9 +1,12 @@
-param location string
-param logAnalyticeWorkspaceName string
+param LOCATION string = resourceGroup().location
+param LOG_ANALYTICS_WORKSPACE_NAME string
+param HUB_VIRTUAL_NETWORK object
+
+param BASTION object
 
 resource logAnalyticeWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10-01' = {
-  name: logAnalyticeWorkspaceName
-  location: location
+  name: LOG_ANALYTICS_WORKSPACE_NAME
+  location: LOCATION
   properties: {
     sku: {
       name: 'PerGB2018'
@@ -15,8 +18,8 @@ resource logAnalyticeWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10
 }
 
 resource nsgBastionSubnet 'Microsoft.Network/networkSecurityGroups@2021-05-01' = {
-  name: 'nsg-${location}-bastion'
-  location: location
+  name: BASTION.NSG_NAME
+  location: LOCATION
   properties: {
     securityRules: [
       {
@@ -198,25 +201,24 @@ resource nsgBastionSubnetDiagnostic 'Microsoft.Insights/diagnosticSettings@2021-
 }
 
 resource virtualNetworkHub 'Microsoft.Network/virtualNetworks@2021-05-01' = {
-  name: 'vnet-${location}-hub'
-  location: location
+  name: HUB_VIRTUAL_NETWORK.NAME
+  location: LOCATION
   properties: {
     addressSpace: {
-      addressPrefixes: [
-        '10.200.0.0/24'
-      ]
+      addressPrefixes: HUB_VIRTUAL_NETWORK.ADDRESS_SPACE //Casting an array from parameter object.
+
     }
     subnets: [
       {
-        name: 'AzureFirewallSubnet'
+        name: HUB_VIRTUAL_NETWORK.SUBNET_NAME_FIREWALL
         properties: {
-          addressPrefix: '10.200.0.0/26'
+          addressPrefix: HUB_VIRTUAL_NETWORK.SUBNET_RANGE_FIREWALL
         }
       }
       {
         name: 'AzureBastionSubnet'
         properties: {
-          addressPrefix: '10.200.0.128/26'
+          addressPrefix: HUB_VIRTUAL_NETWORK.SUBNET_RANGE_BASTION
           networkSecurityGroup: {
             id: nsgBastionSubnet.id
           }
@@ -241,10 +243,10 @@ resource virtualNetworkHubDiagnostic 'Microsoft.Insights/diagnosticSettings@2021
 }
 
 resource bastionPublicIP 'Microsoft.Network/publicIPAddresses@2020-11-01' = {
-  name: 'bastion-pip'
-  location: location
+  name: BASTION.PUBLIC_IP_NAME
+  location: LOCATION
   sku: {
-    name: 'Standard'
+    name: BASTION.PUBLIC_IP_SKU
   }
   properties: {
     publicIPAddressVersion: 'IPv4'
@@ -253,8 +255,8 @@ resource bastionPublicIP 'Microsoft.Network/publicIPAddresses@2020-11-01' = {
 }
 
 resource bastion 'Microsoft.Network/bastionHosts@2020-11-01' = {
-  name: 'aks-bastion'
-  location: location
+  name: BASTION.NAME
+  location: LOCATION
   properties: {
     ipConfigurations: [
       {

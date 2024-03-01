@@ -1,35 +1,27 @@
-param aksAdminGroup string
-param clusterAuthorizedIPRanges array = []
-param location string
-param kubernetesVersion string
-param clusterName string
-param logAnalyticsWorkspaceName string
-param virtualNetworkName string
-param privateCluster bool
-param applicationGatewayName string
-param domainName string
-param containerRegistryName string
-param aksOSSKU string
-param keyVautlName string = 'aks-certificates'
-param keyVaultResourceGroupoName string = 'aks-shared-resources'
-param workloadIdentityServiceAccountName string
-param workloadIdentityServiceAccountNamespace string
+
+param AKS_CONFIG_PARAM object
+param CONTAINER_REGISTRY_NAME string
+param KEY_VAULT object
+param APPLICATION_GATEWAY object
+param LOG_ANALYTICS_WORKSPACE_NAME string
+param LOCATION string = resourceGroup().location
+param VIRTUAL_NETWORK_NAME string
 
 var isUsingAzureRBACasKubernetesRBAC = (subscription().tenantId == subscription().tenantId)
-var aksIngressDomainName = 'aks-ingress.${domainName}'
+var aksIngressDomainName = 'aks-ingress.${APPLICATION_GATEWAY.DOMAIN}'
 var aksBackendDomainName = 'bu0001a0008-00.${aksIngressDomainName}'
 
 resource virtualNetwork 'Microsoft.Network/virtualNetworks@2021-05-01' existing = {
-  name: virtualNetworkName
+  name: VIRTUAL_NETWORK_NAME
 }
 
 resource logAnalyticeWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10-01' existing = {
-  name: logAnalyticsWorkspaceName
+  name: LOG_ANALYTICS_WORKSPACE_NAME
 }
 
 resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
-  name: keyVautlName
-  scope: resourceGroup(keyVaultResourceGroupoName)
+  name: KEY_VAULT.NAME
+  scope: resourceGroup(KEY_VAULT.RESOURCE_GROUP_NAME)
 }
 
 resource aksDomainCertificate 'Microsoft.KeyVault/vaults/secrets@2023-07-01'  existing = {
@@ -38,13 +30,13 @@ resource aksDomainCertificate 'Microsoft.KeyVault/vaults/secrets@2023-07-01'  ex
 }
 
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2021-09-01' existing = {
-  name: containerRegistryName
+  name: CONTAINER_REGISTRY_NAME
 }
 
 // The control plane identity used by the cluster. Used for networking access (VNET joining and DNS updating)
 resource clusterIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2018-11-30' = {
-  name: 'aks-${clusterName}'
-  location: location
+  name: AKS_CONFIG_PARAM.CLUSTER_NAME
+  location: LOCATION
 }
 
 module clusterIdentityAssignment 'modules/cluster-access.bicep' = {
@@ -65,11 +57,11 @@ resource clusterAdminRole 'Microsoft.Authorization/roleDefinitions@2018-01-01-pr
 
 resource clusterAdminRoleAssignment 'Microsoft.Authorization/roleAssignments@2020-10-01-preview' = if (isUsingAzureRBACasKubernetesRBAC) {
   scope: AKSCluster
-  name: guid('microsoft-entra-admin-group', AKSCluster.id, aksAdminGroup)
+  name: guid('microsoft-entra-admin-group', AKSCluster.id, AKS_CONFIG_PARAM.AKS_ENTRA_ADMIN_GROUP)
   properties: {
     roleDefinitionId: clusterAdminRole.id
     description: 'Members of this group are cluster admins of this cluster.'
-    principalId: aksAdminGroup
+    principalId: AKS_CONFIG_PARAM.AKS_ENTRA_ADMIN_GROUP
     principalType: 'Group'
   }
 }
@@ -83,22 +75,22 @@ resource serviceClusterUserRole 'Microsoft.Authorization/roleDefinitions@2018-01
 
 resource serviceClusterUserRoleAssignment 'Microsoft.Authorization/roleAssignments@2020-10-01-preview' = if (isUsingAzureRBACasKubernetesRBAC) {
   scope: AKSCluster
-  name: guid('microsoft-entra-admin-group-sc', AKSCluster.id, aksAdminGroup)
+  name: guid('microsoft-entra-admin-group-sc', AKSCluster.id, AKS_CONFIG_PARAM.AKS_ENTRA_ADMIN_GROUP)
   properties: {
     roleDefinitionId: serviceClusterUserRole.id
     description: 'Members of this group are cluster users of this cluster.'
-    principalId: aksAdminGroup
+    principalId: AKS_CONFIG_PARAM.AKS_ENTRA_ADMIN_GROUP
     principalType: 'Group'
   }
 }
 
 // TODO - review all settings
 resource AKSCluster 'Microsoft.ContainerService/managedClusters@2023-02-02-preview' = {
-  name: clusterName
-  location: location
+  name: AKS_CONFIG_PARAM.CLUSTER_NAME
+  location: LOCATION
   properties: {
-    kubernetesVersion: kubernetesVersion
-    dnsPrefix: uniqueString(subscription().subscriptionId, resourceGroup().id, clusterName)
+    kubernetesVersion: AKS_CONFIG_PARAM.KUBERNETES_VERSION
+    dnsPrefix: uniqueString(subscription().subscriptionId, resourceGroup().id, AKS_CONFIG_PARAM.CLUSTER_NAME)
     agentPoolProfiles: [
       {
         name: 'npsystem'
@@ -107,7 +99,7 @@ resource AKSCluster 'Microsoft.ContainerService/managedClusters@2023-02-02-previ
         osDiskSizeGB: 80
         osDiskType: 'Ephemeral'
         osType: 'Linux'
-        osSKU: aksOSSKU
+        osSKU: AKS_CONFIG_PARAM.AKS_OS_SKU
         minCount: 3
         maxCount: 4
         vnetSubnetID:'${virtualNetwork.id}/subnets/kubernetes-nodes'
@@ -119,7 +111,7 @@ resource AKSCluster 'Microsoft.ContainerService/managedClusters@2023-02-02-previ
         mode: 'System'
         scaleSetPriority: 'Regular'
         scaleSetEvictionPolicy: 'Delete'
-        orchestratorVersion: kubernetesVersion
+        orchestratorVersion: AKS_CONFIG_PARAM.KUBERNETES_VERSION
         enableNodePublicIP: false
         maxPods: 30
         availabilityZones: [
@@ -141,7 +133,7 @@ resource AKSCluster 'Microsoft.ContainerService/managedClusters@2023-02-02-previ
         osDiskSizeGB: 120
         osDiskType: 'Ephemeral'
         osType: 'Linux'
-        osSKU: aksOSSKU
+        osSKU: AKS_CONFIG_PARAM.AKS_OS_SKU
         minCount: 2
         maxCount: 5
         vnetSubnetID: '${virtualNetwork.id}/subnets/kubernetes-nodes'
@@ -153,7 +145,7 @@ resource AKSCluster 'Microsoft.ContainerService/managedClusters@2023-02-02-previ
         mode: 'User'
         scaleSetPriority: 'Regular'
         scaleSetEvictionPolicy: 'Delete'
-        orchestratorVersion: kubernetesVersion
+        orchestratorVersion: AKS_CONFIG_PARAM.KUBERNETES_VERSION
         enableNodePublicIP: false
         maxPods: 30
         availabilityZones: [
@@ -211,7 +203,7 @@ resource AKSCluster 'Microsoft.ContainerService/managedClusters@2023-02-02-previ
     aadProfile: {
       managed: true
       enableAzureRBAC: isUsingAzureRBACasKubernetesRBAC
-      adminGroupObjectIDs: ((!isUsingAzureRBACasKubernetesRBAC) ? array(aksAdminGroup) : [])
+      adminGroupObjectIDs: ((!isUsingAzureRBACasKubernetesRBAC) ? array(AKS_CONFIG_PARAM.AKS_ENTRA_ADMIN_GROUP) : [])
       tenantID: subscription().tenantId
     }
     autoScalerProfile: {
@@ -234,8 +226,8 @@ resource AKSCluster 'Microsoft.ContainerService/managedClusters@2023-02-02-previ
       'skip-nodes-with-system-pods': 'true'
     }
     apiServerAccessProfile: {
-      authorizedIPRanges: clusterAuthorizedIPRanges
-      enablePrivateCluster: privateCluster
+      authorizedIPRanges: AKS_CONFIG_PARAM.AUTHORIZED_IP_RANGES
+      enablePrivateCluster: AKS_CONFIG_PARAM.PRIVATE_CLUSTER
     }
     podIdentityProfile: {
       enabled: false // Using Microsoft Entra Workload IDs for pod identities.
@@ -331,13 +323,13 @@ resource cluaterACRAccess 'Microsoft.Authorization/roleAssignments@2020-10-01-pr
 // Workload Identity for Key Vault access.
 resource podWorkladIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2022-01-31-preview' = {
   name: 'pod-workload'
-  location: location
+  location: LOCATION
 
   resource federatedCreds 'federatedIdentityCredentials@2022-01-31-preview' = {
     name: 'pod-workload'
     properties: {
       issuer: AKSCluster.properties.oidcIssuerProfile.issuerURL
-      subject: 'system:serviceaccount:${workloadIdentityServiceAccountNamespace}:${workloadIdentityServiceAccountName}'
+      subject: 'system:serviceaccount:${AKS_CONFIG_PARAM.WORKLOAD_IDENTITY_NS}:${AKS_CONFIG_PARAM.WORKLOAD_IDENTITY_SA_NAME}'
       audiences: [
         'api://AzureADTokenExchange'
       ]
@@ -347,7 +339,7 @@ resource podWorkladIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@20
 
 module podWorkloadIdentityAKVAccess 'modules/key-vault-access.bicep' = {
   name: 'podWorkloadIdentityAKVAccess'
-  scope: resourceGroup(keyVaultResourceGroupoName)
+  scope: resourceGroup(KEY_VAULT.RESOURCE_GROUP_NAME)
   params: {
     keyVaultName: keyVault.name
     miAppGatewayPrincipalId: podWorkladIdentity.properties.principalId
@@ -358,7 +350,7 @@ module podWorkloadIdentityAKVAccess 'modules/key-vault-access.bicep' = {
 // Workload Identity for Ingress Controller Key Vault access.
 resource podWorkladIdentityIngress 'Microsoft.ManagedIdentity/userAssignedIdentities@2022-01-31-preview' = {
   name: 'ingress-pod-workload'
-  location: location
+  location: LOCATION
 
   resource federatedCreds 'federatedIdentityCredentials@2022-01-31-preview' = {
     name: 'ingress-controller'
@@ -374,7 +366,7 @@ resource podWorkladIdentityIngress 'Microsoft.ManagedIdentity/userAssignedIdenti
 
 module ingressIdentityAKVAccess 'modules/key-vault-access.bicep' = {
   name: 'ingressIdentityAKVAccess'
-  scope: resourceGroup(keyVaultResourceGroupoName)
+  scope: resourceGroup(KEY_VAULT.RESOURCE_GROUP_NAME)
   params: {
     keyVaultName: keyVault.name
     miAppGatewayPrincipalId: podWorkladIdentityIngress.properties.principalId
@@ -385,12 +377,12 @@ module ingressIdentityAKVAccess 'modules/key-vault-access.bicep' = {
 // User Managed Identity that App Gateway is assigned. Used for Azure Key Vault Access.
 resource appGatewayFrontend 'Microsoft.ManagedIdentity/userAssignedIdentities@2018-11-30' = {
   name: 'application-gateway'
-  location: location
+  location: LOCATION
 }
 
 resource applicationGatewayIP 'Microsoft.Network/publicIPAddresses@2021-05-01' = {
   name: 'cluster-ingress-ip'
-  location: location
+  location: LOCATION
   sku: {
     name: 'Standard'
   }
@@ -407,8 +399,8 @@ resource applicationGatewayIP 'Microsoft.Network/publicIPAddresses@2021-05-01' =
 }
 
 resource WAFPolicy 'Microsoft.Network/ApplicationGatewayWebApplicationFirewallPolicies@2021-05-01' = {
-  name: 'waf-${clusterName}'
-  location: location
+  name: AKS_CONFIG_PARAM.CLUSTER_NAME
+  location: LOCATION
   properties: {
     policySettings: {
       fileUploadLimitInMb: 10
@@ -434,7 +426,7 @@ resource WAFPolicy 'Microsoft.Network/ApplicationGatewayWebApplicationFirewallPo
 
 module appGatewayKeyVaultAccess 'modules/key-vault-access.bicep' = {
   name: 'appGatewayKeyVaultAccess'
-  scope: resourceGroup(keyVaultResourceGroupoName)
+  scope: resourceGroup(KEY_VAULT.RESOURCE_GROUP_NAME)
   params: {
     keyVaultName: keyVault.name
     miAppGatewayPrincipalId: appGatewayFrontend.properties.principalId
@@ -443,15 +435,15 @@ module appGatewayKeyVaultAccess 'modules/key-vault-access.bicep' = {
 }
 
 resource applicationGateway 'Microsoft.Network/applicationGateways@2021-05-01' = {
-  name: applicationGatewayName
-  location: location
+  name: APPLICATION_GATEWAY.NAME
+  location: LOCATION
   identity: {
     type: 'UserAssigned'
     userAssignedIdentities: {
       '${appGatewayFrontend.id}': {}
     }
   }
-  zones: pickZones('Microsoft.Network', 'applicationGateways', location, 3)
+  zones: pickZones('Microsoft.Network', 'applicationGateways', LOCATION, 3)
   properties: {
     sku: {
       name: 'WAF_v2'
@@ -514,7 +506,7 @@ resource applicationGateway 'Microsoft.Network/applicationGateways@2021-05-01' =
     enableHttp2: false
     sslCertificates: [
       {
-        name: '${applicationGatewayName}-ssl-certificate'
+        name: '${APPLICATION_GATEWAY.NAME}-ssl-certificate'
         properties: {
           keyVaultSecretId: aksDomainCertificate.properties.secretUri
         }
@@ -557,7 +549,7 @@ resource applicationGateway 'Microsoft.Network/applicationGateways@2021-05-01' =
           pickHostNameFromBackendAddress: true
           requestTimeout: 20
           probe: {
-            id: resourceId('Microsoft.Network/applicationGateways/probes', applicationGatewayName, 'probe-${aksBackendDomainName}')
+            id: resourceId('Microsoft.Network/applicationGateways/probes', APPLICATION_GATEWAY.NAME, 'probe-${aksBackendDomainName}')
           }
           // trustedRootCertificates: [
           //   {
@@ -572,16 +564,16 @@ resource applicationGateway 'Microsoft.Network/applicationGateways@2021-05-01' =
         name: 'listener-https'
         properties: {
           frontendIPConfiguration: {
-            id: resourceId('Microsoft.Network/applicationGateways/frontendIPConfigurations', applicationGatewayName, 'apw-frontend-ip-configuration')
+            id: resourceId('Microsoft.Network/applicationGateways/frontendIPConfigurations', APPLICATION_GATEWAY.NAME, 'apw-frontend-ip-configuration')
           }
           frontendPort: {
-            id: resourceId('Microsoft.Network/applicationGateways/frontendPorts', applicationGatewayName, 'port-443')
+            id: resourceId('Microsoft.Network/applicationGateways/frontendPorts', APPLICATION_GATEWAY.NAME, 'port-443')
           }
           protocol: 'Https'
           sslCertificate: {
-            id: resourceId('Microsoft.Network/applicationGateways/sslCertificates', applicationGatewayName, '${applicationGatewayName}-ssl-certificate')
+            id: resourceId('Microsoft.Network/applicationGateways/sslCertificates', APPLICATION_GATEWAY.NAME, '${APPLICATION_GATEWAY.NAME}-ssl-certificate')
           }
-          hostName: domainName
+          hostName: APPLICATION_GATEWAY.DOMAIN
           hostNames: []
           requireServerNameIndication: true
         }
@@ -593,13 +585,13 @@ resource applicationGateway 'Microsoft.Network/applicationGateways@2021-05-01' =
         properties: {
           ruleType: 'Basic'
           httpListener: {
-            id: resourceId('Microsoft.Network/applicationGateways/httpListeners', applicationGatewayName, 'listener-https')
+            id: resourceId('Microsoft.Network/applicationGateways/httpListeners', APPLICATION_GATEWAY.NAME, 'listener-https')
           }
           backendAddressPool: {
-            id: resourceId('Microsoft.Network/applicationGateways/backendAddressPools', applicationGatewayName, aksBackendDomainName)
+            id: resourceId('Microsoft.Network/applicationGateways/backendAddressPools', APPLICATION_GATEWAY.NAME, aksBackendDomainName)
           }
           backendHttpSettings: {
-            id: resourceId('Microsoft.Network/applicationGateways/backendHttpSettingsCollection', applicationGatewayName, 'aks-ingress-backendpool-httpsettings')
+            id: resourceId('Microsoft.Network/applicationGateways/backendHttpSettingsCollection', APPLICATION_GATEWAY.NAME, 'aks-ingress-backendpool-httpsettings')
           }
         }
       }

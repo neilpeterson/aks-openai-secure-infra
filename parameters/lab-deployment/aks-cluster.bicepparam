@@ -1,17 +1,27 @@
 using '../../cluster-deployment/aks-cluster.bicep'
 
-param aksOSSKU = 'AzureLinux'
-param clusterName = 'aks-cluster-one'
-param keyVaultResourceGroupoName = 'aks-shared-resources'
-param keyVautlName = 'aks-certificates'
-param location = 'eastus'
-param aksAdminGroup = '1c53e0cf-094a-49bb-b746-ff2d9f601b6c'
-param kubernetesVersion = '1.28.3'
-param logAnalyticsWorkspaceName = 'all-logs'
-param virtualNetworkName = 'appgw-kubernetes'
-param privateCluster = false
-param applicationGatewayName = 'appgw-kubernetes'
-param domainName = 'apim-lab-aks.nepeters.supplychain.microsoft.com'
-param containerRegistryName = 'nepcontainerregistry'
-param workloadIdentityServiceAccountName = 'pod-workload'
-param workloadIdentityServiceAccountNamespace = 'default'
+param AKS_CONFIG_PARAM = {
+  CLUSTER_NAME:               'aks-cluster-one'
+  AKS_OS_SKU:                 'AzureLinux'
+  AKS_ENTRA_ADMIN_GROUP:      '1c53e0cf-094a-49bb-b746-ff2d9f601b6c'
+  KUBERNETES_VERSION:         '1.28.3'
+  PRIVATE_CLUSTER:            false
+  WORKLOAD_IDENTITY_SA_NAME:  'pod-workload'  // Used when setting up federated credential, need to match service account manifest.
+  WORKLOAD_IDENTITY_NS:       'default'       // Used when setting up federated credential, need to match service account manifest.
+  AUTHORIZED_IP_RANGES:       []
+}
+
+param APPLICATION_GATEWAY = {
+  NAME:                'appgw-kubernetes'
+  DOMAIN:             'apim-lab-aks.nepeters.supplychain.microsoft.com'
+}
+
+param KEY_VAULT = {
+  NAME:                'aks-certificates'
+  RESOURCE_GROUP_NAME: 'aks-shared-resources'
+  LOCATION:                      'eastus'
+}
+
+param CONTAINER_REGISTRY_NAME       = 'scecontainerregistry'
+param LOG_ANALYTICS_WORKSPACE_NAME  = 'all-logs'
+param VIRTUAL_NETWORK_NAME          = 'appgw-kubernetes'
