@@ -286,9 +286,10 @@ resource AKSCluster 'Microsoft.ContainerService/managedClusters@2023-02-02-previ
       enabled: true
     }
     enableNamespaceResources: false
+    // Managed NGINX Ingress Controller - enabling, figure out how to use it.
     ingressProfile: {
       webAppRouting: {
-        enabled: false
+        enabled: true
       }
     }
   }
