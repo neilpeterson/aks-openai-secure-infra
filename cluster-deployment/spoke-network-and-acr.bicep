@@ -1,36 +1,34 @@
-param location string
-param clusterVNetName string
-param geoRedundancyLocation string
-param acrServiceName string
-param hubVirtualNetworkName string
-param hubVirtualNetworkResourceGroup string
-param keyVautlName string
-param keyVaultResourceGroupoName string
+param LOCATION string = resourceGroup().location
+param CONTAINER_REGISTRY object
+param KEY_VAULT object
+param CLUSTER_VIRTUAL_NETWORK object
+param HUB_VIRTUAL_NETWORK object
+param LOG_ANALYTICS_WORKSPACE_NAME string
 
 resource hubVirtualNetwork 'Microsoft.Network/virtualNetworks@2021-05-01' existing = {
-  name: hubVirtualNetworkName
-  scope: resourceGroup(hubVirtualNetworkResourceGroup)
+  name: HUB_VIRTUAL_NETWORK.NAME
+  scope: resourceGroup(HUB_VIRTUAL_NETWORK.RESOURCE_GROUP_NAME)
 }
 
 resource nsgNodepoolSubnet 'Microsoft.Network/networkSecurityGroups@2021-05-01' = {
-  name: 'kubernetes-nodes'
-  location: location
+  name: CLUSTER_VIRTUAL_NETWORK.AKS_NODES_SUBNET_NSG_NAME
+  location: LOCATION
   properties: {
     securityRules: []
   }
 }
 
 resource nsgInternalLoadBalancer 'Microsoft.Network/networkSecurityGroups@2021-05-01' = {
-  name: 'kubernetes-internal-lb'
-  location: location
+  name: CLUSTER_VIRTUAL_NETWORK.AKS_INTERNAL_LB_NAME
+  location: LOCATION
   properties: {
     securityRules: []
   }
 }
 
 resource nsgApplicationGateway 'Microsoft.Network/networkSecurityGroups@2021-05-01' = {
-  name: 'application-gateway'
-  location: location
+  name: CLUSTER_VIRTUAL_NETWORK.APP_GW_NSG_NAME
+  location: LOCATION
   properties: {
     securityRules: [
       {
@@ -108,8 +106,8 @@ resource nsgApplicationGateway 'Microsoft.Network/networkSecurityGroups@2021-05-
 }
 
 resource nsgPrivateLinkEndpoints 'Microsoft.Network/networkSecurityGroups@2021-05-01' = {
-  name: 'private-link-endpoints'
-  location: location
+  name: CLUSTER_VIRTUAL_NETWORK.PRIVATE_LINK_NSG_NAME
+  location: LOCATION
   properties: {
     securityRules: [
       {
@@ -156,19 +154,17 @@ resource nsgPrivateLinkEndpoints 'Microsoft.Network/networkSecurityGroups@2021-0
 }
 
 resource virtualNetwork 'Microsoft.Network/virtualNetworks@2021-05-01' = {
-  name: clusterVNetName
-  location: location
+  name: CLUSTER_VIRTUAL_NETWORK.NAME
+  location: LOCATION
   properties: {
     addressSpace: {
-      addressPrefixes: [
-        '10.240.0.0/16'
-      ]
+      addressPrefixes: CLUSTER_VIRTUAL_NETWORK.ADDRESS_SPACE //Casting an array from parameter object.
     }
     subnets: [
       {
-        name: 'kubernetes-nodes'
+        name: CLUSTER_VIRTUAL_NETWORK.AKS_NODES_SUBNET_NAME
         properties: {
-          addressPrefix: '10.240.0.0/22'
+          addressPrefix: CLUSTER_VIRTUAL_NETWORK.AKS_NODES_SUBNET_RANGE
           networkSecurityGroup: {
             id: nsgNodepoolSubnet.id
           }
@@ -177,9 +173,9 @@ resource virtualNetwork 'Microsoft.Network/virtualNetworks@2021-05-01' = {
         }
       }
       {
-        name: 'cluster-internal-lb'
+        name: CLUSTER_VIRTUAL_NETWORK.AKS_INTERNAL_LB_SUBNET_NAME
         properties: {
-          addressPrefix: '10.240.4.0/28'
+          addressPrefix: CLUSTER_VIRTUAL_NETWORK.AKS_INTERNAL_LB_SUBNET_RANGE
           networkSecurityGroup: {
             id: nsgInternalLoadBalancer.id
           }
@@ -188,9 +184,9 @@ resource virtualNetwork 'Microsoft.Network/virtualNetworks@2021-05-01' = {
         }
       }
       {
-        name: 'application-gateway'
+        name: CLUSTER_VIRTUAL_NETWORK.APP_GW_SUBNET_NAME
         properties: {
-          addressPrefix: '10.240.5.0/24'
+          addressPrefix: CLUSTER_VIRTUAL_NETWORK.APP_GW_SUBNET_RANGE
           networkSecurityGroup: {
             id: nsgApplicationGateway.id
           }
@@ -199,9 +195,9 @@ resource virtualNetwork 'Microsoft.Network/virtualNetworks@2021-05-01' = {
         }
       }
       {
-        name: 'private-link-endpoints'
+        name: CLUSTER_VIRTUAL_NETWORK.PRIVATE_LINK_SUBNET_NAME
         properties: {
-          addressPrefix: '10.240.4.32/28'
+          addressPrefix: CLUSTER_VIRTUAL_NETWORK.PRIVATE_LINK_SUBNET_RANGE
           networkSecurityGroup: {
             id: nsgPrivateLinkEndpoints.id
           }
@@ -214,7 +210,7 @@ resource virtualNetwork 'Microsoft.Network/virtualNetworks@2021-05-01' = {
 }
 
 resource peeringSpokeToHub 'Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2021-05-01' = {
-  name: 'peer-to-hub'
+  name: CLUSTER_VIRTUAL_NETWORK.PEER_TO_HUB_NAME
   parent: virtualNetwork
   properties: {
     remoteVirtualNetwork: {
@@ -228,8 +224,8 @@ resource peeringSpokeToHub 'Microsoft.Network/virtualNetworks/virtualNetworkPeer
 }
 
 module peeringHubToSpoke 'modules/peer-hub-to-spoke.bicep' = {
-  name: 'peer-hub-to-spoke'
-  scope: resourceGroup(hubVirtualNetworkResourceGroup)
+  name: CLUSTER_VIRTUAL_NETWORK.PEER_FROM_HUB_NAME
+  scope: resourceGroup(HUB_VIRTUAL_NETWORK.RESOURCE_GROUP_NAME)
   params: {
     remoteVirtualNetworkId: virtualNetwork.id
     localVnetName: hubVirtualNetwork.name
@@ -240,8 +236,8 @@ module peeringHubToSpoke 'modules/peer-hub-to-spoke.bicep' = {
 }
 
 resource logAnalyticeWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10-01' = {
-  name: 'all-logs'
-  location: location
+  name: LOG_ANALYTICS_WORKSPACE_NAME
+  location: LOCATION
   properties: {
     sku: {
       name: 'PerGB2018'
@@ -291,10 +287,10 @@ resource adminAccountContainerRegistryAccessDisallowed 'Microsoft.Authorization/
 }
 
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2021-09-01' = {
-  name: acrServiceName
-  location: location
+  name: CONTAINER_REGISTRY.NAME
+  location: LOCATION
   sku: {
-    name: 'Premium'
+    name: CONTAINER_REGISTRY.SKU_NAME
   }
   properties: {
     adminUserEnabled: false
@@ -329,8 +325,8 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2021-09-01' =
   ]
 
   resource acrReplication 'replications@2021-09-01' = {
-    name: geoRedundancyLocation
-    location: geoRedundancyLocation
+    name: CONTAINER_REGISTRY.GEO_REDUNDANT_LOCATION
+    location: CONTAINER_REGISTRY.GEO_REDUNDANT_LOCATION
     properties: {}
   }
 }
@@ -359,7 +355,7 @@ resource containerRegistryDiagnostics 'Microsoft.Insights/diagnosticSettings@202
 // Expose Azure Container Registry via Private Link, into the cluster nodes virtual network.
 resource privateEndpointACRToVnet 'Microsoft.Network/privateEndpoints@2022-09-01' = {
   name: containerRegistry.name
-  location: location
+  location: LOCATION
   dependsOn: [
     containerRegistry::acrReplication
   ]
@@ -415,8 +411,8 @@ resource dnsPrivateZoneACR 'Microsoft.Network/privateDnsZones@2020-06-01' = {
 }
 
 resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
-  name: keyVautlName
-  scope: resourceGroup(keyVaultResourceGroupoName)
+  name: KEY_VAULT.NAME
+  scope: resourceGroup(KEY_VAULT.RESOURCE_GROUP_NAME)
 }
 
 // Enabling Azure Key Vault Private Link support.
@@ -438,7 +434,7 @@ resource dnsPrivateZoneAKV 'Microsoft.Network/privateDnsZones@2020-06-01' = {
 
 resource privateEndpointAKVToVnet 'Microsoft.Network/privateEndpoints@2021-05-01' = {
   name: keyVault.name
-  location: location
+  location: LOCATION
   properties: {
     subnet: {
       id: '${virtualNetwork.id}/subnets/private-link-endpoints'
