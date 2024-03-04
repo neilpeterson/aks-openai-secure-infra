@@ -9,6 +9,8 @@ param AKS_CONFIG_PARAM = {
   WORKLOAD_IDENTITY_SA_NAME:  'pod-workload'  // Used when setting up federated credential, need to match service account manifest.
   WORKLOAD_IDENTITY_NS:       'default'       // Used when setting up federated credential, need to match service account manifest.
   AUTHORIZED_IP_RANGES:       []
+  AKS_NODES_SUBNET_NAME:      'kubernetes-nodes'
+  AKS_INTERNAL_LB_NAME:       'kubernetes-internal-lb'
 }
 
 param APPLICATION_GATEWAY = {

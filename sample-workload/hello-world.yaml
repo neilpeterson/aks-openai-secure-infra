@@ -24,37 +24,37 @@ spec:
           value: "https://aks-certificates.vault.azure.net/"
         - name: SECRET_NAME
           value: 'jump-box-admin-password'
----
-apiVersion: v1
-kind: Pod
-metadata:
-  name: quick-start
-  namespace: "default"
-  labels:
-    azure.workload.identity/use: "true"
-spec:
-  serviceAccountName: "pod-workload"
-  containers:
-    - image: ghcr.io/azure/azure-workload-identity/msal-go
-      name: oidc
-      env:
-      - name: KEYVAULT_URL
-        value: "https://aks-certificates.vault.azure.net/"
-      - name: SECRET_NAME
-        value: 'jump-box-admin-password'
-  nodeSelector:
-    kubernetes.io/os: linux
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: nginx-service
-spec:
-  type: LoadBalancer
-  ports:
-  - port: 80
-  selector:
-    app: nginx
+# ---
+# apiVersion: v1
+# kind: Pod
+# metadata:
+#   name: quick-start
+#   namespace: "default"
+#   labels:
+#     azure.workload.identity/use: "true"
+# spec:
+#   serviceAccountName: "pod-workload"
+#   containers:
+#     - image: ghcr.io/azure/azure-workload-identity/msal-go
+#       name: oidc
+#       env:
+#       - name: KEYVAULT_URL
+#         value: "https://aks-certificates.vault.azure.net/"
+#       - name: SECRET_NAME
+#         value: 'jump-box-admin-password'
+#   nodeSelector:
+#     kubernetes.io/os: linux
+# ---
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: nginx-service
+# spec:
+#   type: LoadBalancer
+#   ports:
+#   - port: 80
+#   selector:
+#     app: nginx
 # ---
 # apiVersion: secrets-store.csi.x-k8s.io/v1
 # kind: SecretProviderClass

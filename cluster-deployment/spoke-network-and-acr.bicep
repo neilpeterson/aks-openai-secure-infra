@@ -45,6 +45,21 @@ resource nsgApplicationGateway 'Microsoft.Network/networkSecurityGroups@2021-05-
           priority: 100
         }
       }
+      //TODO - Consider removing after development
+      {
+        name: 'Allow80Inbound'
+        properties: {
+          description: 'Allow ALL web traffic into 80. (If you wanted to allow-list specific IPs, this is where you\'d list them.)'
+          protocol: 'Tcp'
+          sourcePortRange: '*'
+          sourceAddressPrefix: 'Internet'
+          destinationPortRange: '80'
+          destinationAddressPrefix: 'VirtualNetwork'
+          direction: 'Inbound'
+          access: 'Allow'
+          priority: 130
+        }
+      }
       {
         name: 'AllowControlPlaneInbound'
         properties: {

@@ -3,33 +3,27 @@ targetScope = 'resourceGroup'
 param miClusterControlPlanePrincipalId string
 param clusterControlPlaneIdentityName string
 param targetVirtualNetworkName string
-
-/*** EXISTING SUBSCRIPTION RESOURCES ***/
+param aksNodesSubnetName string
+param aksInternalLABSubnetName string
 
 resource networkContributorRole 'Microsoft.Authorization/roleDefinitions@2018-01-01-preview' existing = {
   name: '4d97b98b-1d4f-4787-a291-c67834d212e7'
   scope: subscription()
 }
 
-/*** EXISTING HUB RESOURCES ***/
-
 resource targetVirtualNetwork 'Microsoft.Network/virtualNetworks@2021-05-01' existing = {
   name: targetVirtualNetworkName
 }
 
-// TODO - add subnet parameter
 resource snetClusterNodes 'Microsoft.Network/virtualNetworks/subnets@2021-05-01' existing = {
   parent: targetVirtualNetwork
-  name: 'kubernetes-nodes'
+  name: aksNodesSubnetName
 }
 
-// TODO - add subnet parameter
 resource snetClusterIngress 'Microsoft.Network/virtualNetworks/subnets@2021-05-01' existing = {
   parent: targetVirtualNetwork
-  name: 'cluster-internal-lb'
+  name: aksInternalLABSubnetName
 }
-
-/*** RESOURCES ***/
 
 resource snetClusterNodesMiClusterControlPlaneNetworkContributorRole_roleAssignment 'Microsoft.Authorization/roleAssignments@2020-10-01-preview' = {
   scope: snetClusterNodes
