@@ -288,7 +288,7 @@ resource AKSCluster 'Microsoft.ContainerService/managedClusters@2023-02-02-previ
     enableNamespaceResources: false
     ingressProfile: {
       webAppRouting: {
-        enabled: false
+        enabled: true
       }
     }
   }
